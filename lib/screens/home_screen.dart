@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
-import '../services/credential_storage.dart';
-import 'login_screen.dart';
-import 'profile_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:authapp1/features/auth/auth.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
-  Future<void> _signOut(BuildContext context) async {
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     try {
-      await AuthService().signOut();
+      await ref.read(sessionManagerProvider).signOut();
     } catch (_) {}
-    await CredentialStorage().clear();
     if (!context.mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -20,7 +17,7 @@ class HomeScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Home'),
@@ -28,7 +25,7 @@ class HomeScreen extends StatelessWidget {
           IconButton(
             tooltip: 'Sign out',
             icon: const Icon(Icons.logout),
-            onPressed: () => _signOut(context),
+            onPressed: () => _signOut(context, ref),
           ),
           IconButton(
             icon: const Icon(Icons.settings),
@@ -47,7 +44,7 @@ class HomeScreen extends StatelessWidget {
             const Text('Welcome!'),
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: () => _signOut(context),
+              onPressed: () => _signOut(context, ref),
               icon: const Icon(Icons.logout),
               label: const Text('Sign out'),
             ),
@@ -57,5 +54,3 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
-
-

@@ -1,27 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
-import 'amplifyconfiguration.dart';
-import 'screens/login_screen.dart';
-import 'screens/splash_screen.dart';
-import 'services/auth_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:authapp1/features/auth/auth.dart';
+import 'package:authapp1/theme/app_theme.dart';
+import 'config/app_environment.dart';
+import 'amplifyconfiguration.dart';
+import 'screens/splash_screen.dart';
 
-void main() {
-  runApp(const ProviderScope(child: MyApp()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final envValue = const String.fromEnvironment('APP_ENV');
+  final environmentConfig = buildEnvironmentConfig(envValue);
+  await _AmplifyBootstrapper.ensureConfigured();
+  runApp(
+    ProviderScope(
+      overrides: [
+        authConfigProvider.overrideWithValue(environmentConfig.authConfig),
+      ],
+      child: MyApp(environment: environmentConfig.environment),
+    ),
+  );
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class MyApp extends ConsumerStatefulWidget {
+  const MyApp({super.key, required this.environment});
 
-  // This widget is the root of your application.
+  final AppEnvironment environment;
+
+  @override
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    bootstrapPlatformHooks(ref);
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Auth App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
+      theme: AppTheme.light(),
       home: const SplashScreen(),
+      debugShowCheckedModeBanner: widget.environment != AppEnvironment.prod,
     );
   }
 }

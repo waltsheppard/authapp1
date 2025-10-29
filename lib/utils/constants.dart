@@ -1,13 +1,13 @@
 import 'package:flutter/foundation.dart';
+import 'package:authapp1/features/auth/config/auth_config.dart';
 
 class AppConstants {
   static const int resendCooldownSeconds = 30;
+  static final AuthConfig _defaultConfig = AuthConfig();
 
-  static final RegExp emailRegex = RegExp(r'^.+@.+\..+$');
-  static final RegExp e164Regex = RegExp(r'^\+[1-9]\d{7,14}$');
+  static RegExp get emailRegex => _defaultConfig.emailRegex;
+  static RegExp get e164Regex => _defaultConfig.phoneRegex;
 
   static bool get isWeb => kIsWeb;
 }
-
-
 

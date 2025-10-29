@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:amplify_flutter/amplify_flutter.dart';
-import '../services/auth_service.dart';
-import 'home_screen.dart';
-import 'login_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:authapp1/features/auth/auth.dart';
+import 'package:authapp1/screens/home_screen.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
@@ -20,9 +19,8 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _bootstrap() async {
     try {
-      await AuthService().configureIfNeeded();
-      // configure called in main already; safe to call fetch session
-      final session = await Amplify.Auth.fetchAuthSession();
+      final sessionManager = ref.read(sessionManagerProvider);
+      final session = await sessionManager.currentSession();
       if (!mounted) return;
       if (session.isSignedIn) {
         Navigator.of(context).pushReplacement(
@@ -48,6 +46,3 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 }
-
-
-
