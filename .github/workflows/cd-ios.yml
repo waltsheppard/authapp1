@@ -1,0 +1,59 @@
+name: iOS Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      exportMethod:
+        description: "Export method (app-store|ad-hoc|enterprise|development)"
+        required: true
+        default: app-store
+
+jobs:
+  build-and-deploy:
+    runs-on: macos-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install --repo-update
+
+      - name: Decrypt signing assets
+        if: ${{ secrets.APPLE_CERT_P12_BASE64 != '' }}
+        run: |
+          mkdir -p ~/certs
+          echo "${{ secrets.APPLE_CERT_P12_BASE64 }}" | base64 --decode > ~/certs/cert.p12
+          security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          security import ~/certs/cert.p12 -k build.keychain -P "${{ secrets.APPLE_CERT_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          echo "${{ secrets.APPLE_PROVISION_PROFILE_BASE64 }}" | base64 --decode > ~/certs/profile.mobileprovision
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp ~/certs/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+
+      - name: Build IPA
+        run: |
+          flutter build ipa --export-method ${{ github.event.inputs.exportMethod }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-ipa
+          path: build/ios/ipa/*.ipa
+
+      - name: Upload to TestFlight / App Store (optional)
+        if: ${{ secrets.APP_STORE_CONNECT_API_KEY != '' }}
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APP_STORE_CONNECT_API_ISSUER: ${{ secrets.APP_STORE_CONNECT_API_ISSUER }}
+        run: |
+          echo "Add your deployment command (e.g., fastlane deliver or xcrun altool)"
