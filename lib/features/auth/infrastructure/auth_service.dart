@@ -13,10 +13,18 @@ class AuthService {
     required String email,
     required String password,
     required String phoneNumber,
+    required String title,
+    required String firstName,
+    required String lastName,
+    required String organization,
   }) async {
     final userAttributes = {
       CognitoUserAttributeKey.email: email,
       CognitoUserAttributeKey.phoneNumber: phoneNumber,
+      CognitoUserAttributeKey.givenName: firstName,
+      CognitoUserAttributeKey.familyName: lastName,
+      CognitoUserAttributeKey.custom('title'): title,
+      CognitoUserAttributeKey.custom('organization'): organization,
     };
     return await Amplify.Auth.signUp(
       username: email,
@@ -39,10 +47,7 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    return await Amplify.Auth.signIn(
-      username: email,
-      password: password,
-    );
+    return await Amplify.Auth.signIn(username: email, password: password);
   }
 
   Future<CognitoAuthSession> fetchSession() async {
@@ -54,9 +59,7 @@ class AuthService {
     await Amplify.Auth.signOut();
   }
 
-  Future<ResetPasswordResult> resetPassword({
-    required String email,
-  }) async {
+  Future<ResetPasswordResult> resetPassword({required String email}) async {
     return await Amplify.Auth.resetPassword(username: email);
   }
 
@@ -112,16 +115,36 @@ class AuthService {
   }) async {
     final List<AuthUserAttribute> attrs = [];
     if (firstName != null) {
-      attrs.add(AuthUserAttribute(userAttributeKey: CognitoUserAttributeKey.givenName, value: firstName));
+      attrs.add(
+        AuthUserAttribute(
+          userAttributeKey: CognitoUserAttributeKey.givenName,
+          value: firstName,
+        ),
+      );
     }
     if (lastName != null) {
-      attrs.add(AuthUserAttribute(userAttributeKey: CognitoUserAttributeKey.familyName, value: lastName));
+      attrs.add(
+        AuthUserAttribute(
+          userAttributeKey: CognitoUserAttributeKey.familyName,
+          value: lastName,
+        ),
+      );
     }
     if (title != null) {
-      attrs.add(AuthUserAttribute(userAttributeKey: CognitoUserAttributeKey.custom('title'), value: title));
+      attrs.add(
+        AuthUserAttribute(
+          userAttributeKey: CognitoUserAttributeKey.custom('title'),
+          value: title,
+        ),
+      );
     }
     if (organization != null) {
-      attrs.add(AuthUserAttribute(userAttributeKey: CognitoUserAttributeKey.custom('organization'), value: organization));
+      attrs.add(
+        AuthUserAttribute(
+          userAttributeKey: CognitoUserAttributeKey.custom('organization'),
+          value: organization,
+        ),
+      );
     }
     if (attrs.isEmpty) return fetchUserAttributes();
     await Amplify.Auth.updateUserAttributes(attributes: attrs);
@@ -141,10 +164,11 @@ class AuthService {
     return Amplify.Auth.resendSignUpCode(username: username);
   }
 
-  Future<SendUserAttributeVerificationCodeResult> resendAttributeCode(
-      {required CognitoUserAttributeKey key}) async {
-    return Amplify.Auth
-        .sendUserAttributeVerificationCode(userAttributeKey: key);
+  Future<SendUserAttributeVerificationCodeResult> resendAttributeCode({
+    required CognitoUserAttributeKey key,
+  }) async {
+    return Amplify.Auth.sendUserAttributeVerificationCode(
+      userAttributeKey: key,
+    );
   }
 }
-

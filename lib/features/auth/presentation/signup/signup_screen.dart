@@ -21,6 +21,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _codeController = TextEditingController();
+  final _titleController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _organizationController = TextEditingController();
 
   bool _codeSent = false;
   int _resendCooldown = 0;
@@ -33,10 +37,17 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     return null;
   }
 
+  String? _validateRequiredField(String? value, String label) {
+    if (value == null || value.trim().isEmpty) return '$label is required';
+    return null;
+  }
+
   String? _validatePhone(String? value) {
     if (value == null || value.trim().isEmpty) return 'Phone is required';
     final regex = ref.read(authConfigProvider).phoneRegex;
-    if (!regex.hasMatch(value.trim())) return 'Enter phone in E.164 (e.g., +15551234567)';
+    if (!regex.hasMatch(value.trim())) {
+      return 'Enter phone in E.164 (e.g., +15551234567)';
+    }
     return null;
   }
 
@@ -60,22 +71,29 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
         phone: _phoneController.text.trim(),
+        title: _titleController.text.trim(),
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        organization: _organizationController.text.trim(),
       );
       if (mounted) {
         setState(() {
-          _codeSent = res.isSignUpComplete == false; // request code confirmation
+          _codeSent =
+              res.isSignUpComplete == false; // request code confirmation
         });
         _startCooldown(30);
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Verification code sent. Check email/phone.')),
+        const SnackBar(
+          content: Text('Verification code sent. Check email/phone.'),
+        ),
       );
     } on AuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -89,7 +107,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       if (!mounted) return;
       if (res.isSignUpComplete) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Signup confirmed. You can sign in now.')),
+          const SnackBar(
+            content: Text('Signup confirmed. You can sign in now.'),
+          ),
         );
         Navigator.of(context).pop();
       } else {
@@ -99,9 +119,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       }
     } on AuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -118,7 +138,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       _startCooldown(30);
     } on AuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendlyError(e))));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_friendlyError(e))));
     }
   }
 
@@ -138,10 +160,18 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   String _friendlyError(AuthException e) {
     final msg = e.message;
-    if (msg.contains('AliasExistsException')) return 'That email/phone is already in use.';
-    if (msg.contains('TooManyRequestsException')) return 'Too many attempts. Please try again shortly.';
-    if (msg.contains('CodeMismatchException')) return 'Incorrect verification code.';
-    if (msg.contains('ExpiredCodeException')) return 'Verification code expired. Request a new one.';
+    if (msg.contains('AliasExistsException')) {
+      return 'That email/phone is already in use.';
+    }
+    if (msg.contains('TooManyRequestsException')) {
+      return 'Too many attempts. Please try again shortly.';
+    }
+    if (msg.contains('CodeMismatchException')) {
+      return 'Incorrect verification code.';
+    }
+    if (msg.contains('ExpiredCodeException')) {
+      return 'Verification code expired. Request a new one.';
+    }
     return msg;
   }
 
@@ -153,6 +183,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _codeController.dispose();
+    _titleController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _organizationController.dispose();
     super.dispose();
   }
 
@@ -180,72 +214,114 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
               ),
             TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: _validateEmail,
-                ),
-                SizedBox(height: AppSpacing.sm * 1.5),
-                TextFormField(
-                  controller: _phoneController,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone (+E.164)',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: _validatePhone,
-                ),
-                SizedBox(height: AppSpacing.sm * 1.5),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    border: OutlineInputBorder(),
-                  ),
-                  obscureText: true,
-                  validator: _validatePassword,
-                ),
-                SizedBox(height: AppSpacing.sm * 1.5),
-                TextFormField(
-                  controller: _confirmPasswordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Confirm Password',
-                    border: OutlineInputBorder(),
-                  ),
-                  obscureText: true,
-                  validator: _validateConfirm,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                ElevatedButton(
-                  onPressed: isLoading ? null : _signUp,
-                  child: isLoading
+              controller: _titleController,
+              decoration: const InputDecoration(
+                labelText: 'Title',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) => _validateRequiredField(value, 'Title'),
+            ),
+            SizedBox(height: AppSpacing.sm * 1.5),
+            TextFormField(
+              controller: _firstNameController,
+              decoration: const InputDecoration(
+                labelText: 'First name',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) => _validateRequiredField(value, 'First name'),
+            ),
+            SizedBox(height: AppSpacing.sm * 1.5),
+            TextFormField(
+              controller: _lastNameController,
+              decoration: const InputDecoration(
+                labelText: 'Last name',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) => _validateRequiredField(value, 'Last name'),
+            ),
+            SizedBox(height: AppSpacing.sm * 1.5),
+            TextFormField(
+              controller: _organizationController,
+              decoration: const InputDecoration(
+                labelText: 'Organization',
+                border: OutlineInputBorder(),
+              ),
+              validator:
+                  (value) => _validateRequiredField(value, 'Organization'),
+            ),
+            SizedBox(height: AppSpacing.sm * 1.5),
+            TextFormField(
+              controller: _emailController,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(),
+              ),
+              validator: _validateEmail,
+            ),
+            SizedBox(height: AppSpacing.sm * 1.5),
+            TextFormField(
+              controller: _phoneController,
+              decoration: const InputDecoration(
+                labelText: 'Phone (+E.164)',
+                border: OutlineInputBorder(),
+              ),
+              validator: _validatePhone,
+            ),
+            SizedBox(height: AppSpacing.sm * 1.5),
+            TextFormField(
+              controller: _passwordController,
+              decoration: const InputDecoration(
+                labelText: 'Password',
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+              validator: _validatePassword,
+            ),
+            SizedBox(height: AppSpacing.sm * 1.5),
+            TextFormField(
+              controller: _confirmPasswordController,
+              decoration: const InputDecoration(
+                labelText: 'Confirm Password',
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+              validator: _validateConfirm,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            ElevatedButton(
+              onPressed: isLoading ? null : _signUp,
+              child:
+                  isLoading
                       ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                       : const Text('Sign Up'),
+            ),
+            if (_codeSent) ...[
+              const SizedBox(height: AppSpacing.lg),
+              TextFormField(
+                controller: _codeController,
+                decoration: const InputDecoration(
+                  labelText: 'Verification code',
+                  border: OutlineInputBorder(),
                 ),
-                if (_codeSent) ...[
-                  const SizedBox(height: AppSpacing.lg),
-                  TextFormField(
-                    controller: _codeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Verification code',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  OutlinedButton(
-                    onPressed: isLoading ? null : _confirm,
-                    child: const Text('Confirm'),
-                  ),
-                  TextButton(
-                    onPressed: isLoading || _resendCooldown > 0 ? null : _resend,
-                    child: Text(_resendCooldown > 0 ? 'Resend code (${_resendCooldown}s)' : 'Resend code'),
-                  ),
-                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              OutlinedButton(
+                onPressed: isLoading ? null : _confirm,
+                child: const Text('Confirm'),
+              ),
+              TextButton(
+                onPressed: isLoading || _resendCooldown > 0 ? null : _resend,
+                child: Text(
+                  _resendCooldown > 0
+                      ? 'Resend code (${_resendCooldown}s)'
+                      : 'Resend code',
+                ),
+              ),
+            ],
           ],
         ),
       ),

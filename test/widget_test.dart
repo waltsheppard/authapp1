@@ -25,19 +25,31 @@ class _FakeAuthRepository implements AuthRepository, ProfileRepository {
       Future.error(const SignedOutException('User not signed in'));
 
   @override
-  Future<SignInResult> signIn({required String email, required String password}) =>
+  Future<SignInResult> signIn({
+    required String email,
+    required String password,
+  }) => Future.error(UnimplementedError());
+
+  @override
+  Future<SignInResult> confirmSignIn(String value) =>
       Future.error(UnimplementedError());
 
   @override
-  Future<SignInResult> confirmSignIn(String value) => Future.error(UnimplementedError());
+  Future<SignUpResult> signUp({
+    required String email,
+    required String password,
+    required String phone,
+    required String title,
+    required String firstName,
+    required String lastName,
+    required String organization,
+  }) => Future.error(UnimplementedError());
 
   @override
-  Future<SignUpResult> signUp({required String email, required String password, required String phone}) =>
-      Future.error(UnimplementedError());
-
-  @override
-  Future<SignUpResult> confirmSignUp({required String email, required String code}) =>
-      Future.error(UnimplementedError());
+  Future<SignUpResult> confirmSignUp({
+    required String email,
+    required String code,
+  }) => Future.error(UnimplementedError());
 
   @override
   Future<ResetPasswordResult> requestPasswordReset(String username) =>
@@ -62,8 +74,7 @@ class _FakeAuthRepository implements AuthRepository, ProfileRepository {
     String? firstName,
     String? lastName,
     String? organization,
-  }) =>
-      Future.error(UnimplementedError());
+  }) => Future.error(UnimplementedError());
 
   @override
   Future<UpdateUserAttributeResult> updateEmail(String email) =>
@@ -74,12 +85,15 @@ class _FakeAuthRepository implements AuthRepository, ProfileRepository {
       Future.error(UnimplementedError());
 
   @override
-  Future<void> confirmAttribute({required CognitoUserAttributeKey key, required String code}) =>
-      Future.error(UnimplementedError());
+  Future<void> confirmAttribute({
+    required CognitoUserAttributeKey key,
+    required String code,
+  }) => Future.error(UnimplementedError());
 
   @override
-  Future<SendUserAttributeVerificationCodeResult> resendAttributeCode({required CognitoUserAttributeKey key}) =>
-      Future.error(UnimplementedError());
+  Future<SendUserAttributeVerificationCodeResult> resendAttributeCode({
+    required CognitoUserAttributeKey key,
+  }) => Future.error(UnimplementedError());
 }
 
 void main() {

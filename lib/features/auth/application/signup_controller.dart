@@ -12,12 +12,24 @@ class SignupController extends StateNotifier<AsyncValue<void>> {
     required String email,
     required String password,
     required String phone,
+    required String title,
+    required String firstName,
+    required String lastName,
+    required String organization,
   }) async {
     state = const AsyncLoading();
     try {
       final repo = _ref.read(authRepositoryProvider);
       await repo.configure();
-      final result = await repo.signUp(email: email, password: password, phone: phone);
+      final result = await repo.signUp(
+        email: email,
+        password: password,
+        phone: phone,
+        title: title,
+        firstName: firstName,
+        lastName: lastName,
+        organization: organization,
+      );
       state = const AsyncData(null);
       return result;
     } catch (error, stackTrace) {
@@ -26,7 +38,10 @@ class SignupController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<SignUpResult> confirmSignUp({required String email, required String code}) async {
+  Future<SignUpResult> confirmSignUp({
+    required String email,
+    required String code,
+  }) async {
     state = const AsyncLoading();
     try {
       final repo = _ref.read(authRepositoryProvider);
@@ -55,4 +70,6 @@ class SignupController extends StateNotifier<AsyncValue<void>> {
 }
 
 final signupControllerProvider =
-    StateNotifierProvider<SignupController, AsyncValue<void>>((ref) => SignupController(ref));
+    StateNotifierProvider<SignupController, AsyncValue<void>>(
+      (ref) => SignupController(ref),
+    );

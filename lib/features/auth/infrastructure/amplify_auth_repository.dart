@@ -11,19 +11,39 @@ class AmplifyAuthRepository implements AuthRepository, ProfileRepository {
   Future<void> configure() => _service.configureIfNeeded();
 
   @override
-  Future<SignInResult> signIn({required String email, required String password}) =>
-      _service.signIn(email: email, password: password);
+  Future<SignInResult> signIn({
+    required String email,
+    required String password,
+  }) => _service.signIn(email: email, password: password);
 
   @override
-  Future<SignInResult> confirmSignIn(String value) => _service.confirmSignIn(value);
+  Future<SignInResult> confirmSignIn(String value) =>
+      _service.confirmSignIn(value);
 
   @override
-  Future<SignUpResult> signUp({required String email, required String password, required String phone}) =>
-      _service.signUp(email: email, password: password, phoneNumber: phone);
+  Future<SignUpResult> signUp({
+    required String email,
+    required String password,
+    required String phone,
+    required String title,
+    required String firstName,
+    required String lastName,
+    required String organization,
+  }) => _service.signUp(
+    email: email,
+    password: password,
+    phoneNumber: phone,
+    title: title,
+    firstName: firstName,
+    lastName: lastName,
+    organization: organization,
+  );
 
   @override
-  Future<SignUpResult> confirmSignUp({required String email, required String code}) =>
-      _service.confirmSignUp(email: email, code: code);
+  Future<SignUpResult> confirmSignUp({
+    required String email,
+    required String code,
+  }) => _service.confirmSignUp(email: email, code: code);
 
   @override
   Future<ResetPasswordResult> requestPasswordReset(String username) =>
@@ -43,7 +63,8 @@ class AmplifyAuthRepository implements AuthRepository, ProfileRepository {
   Future<void> deleteUser() => _service.deleteUser();
 
   @override
-  Future<List<AuthUserAttribute>> fetchAttributes() => _service.fetchUserAttributes();
+  Future<List<AuthUserAttribute>> fetchAttributes() =>
+      _service.fetchUserAttributes();
 
   @override
   Future<List<AuthUserAttribute>> updateProfileAttributes({
@@ -51,25 +72,29 @@ class AmplifyAuthRepository implements AuthRepository, ProfileRepository {
     String? firstName,
     String? lastName,
     String? organization,
-  }) =>
-      _service.updateProfileAttributes(
-        title: title,
-        firstName: firstName,
-        lastName: lastName,
-        organization: organization,
-      );
+  }) => _service.updateProfileAttributes(
+    title: title,
+    firstName: firstName,
+    lastName: lastName,
+    organization: organization,
+  );
 
   @override
-  Future<UpdateUserAttributeResult> updateEmail(String email) => _service.updateEmail(email);
+  Future<UpdateUserAttributeResult> updateEmail(String email) =>
+      _service.updateEmail(email);
 
   @override
-  Future<UpdateUserAttributeResult> updatePhone(String phone) => _service.updatePhone(phone);
+  Future<UpdateUserAttributeResult> updatePhone(String phone) =>
+      _service.updatePhone(phone);
 
   @override
-  Future<void> confirmAttribute({required CognitoUserAttributeKey key, required String code}) =>
-      _service.confirmAttribute(key: key, code: code);
+  Future<void> confirmAttribute({
+    required CognitoUserAttributeKey key,
+    required String code,
+  }) => _service.confirmAttribute(key: key, code: code);
 
   @override
-  Future<SendUserAttributeVerificationCodeResult> resendAttributeCode({required CognitoUserAttributeKey key}) =>
-      _service.resendAttributeCode(key: key);
+  Future<SendUserAttributeVerificationCodeResult> resendAttributeCode({
+    required CognitoUserAttributeKey key,
+  }) => _service.resendAttributeCode(key: key);
 }
