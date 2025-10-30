@@ -17,11 +17,9 @@ class BiometricService {
     try {
       final didAuthenticate = await _localAuth.authenticate(
         localizedReason: reason,
-        options: const AuthenticationOptions(
-          biometricOnly: true,
-          stickyAuth: true,
-          useErrorDialogs: true,
-        ),
+        biometricOnly: true,
+        persistAcrossBackgrounding: true,
+        sensitiveTransaction: true,
       );
       return didAuthenticate;
     } catch (_) {
@@ -29,6 +27,5 @@ class BiometricService {
     }
   }
 }
-
 
 

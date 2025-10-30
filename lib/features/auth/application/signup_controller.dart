@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import 'package:authapp1/features/auth/auth.dart';
 
