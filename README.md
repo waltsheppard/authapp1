@@ -5,8 +5,8 @@ This document captures the steps required to stand up the Amplify environment an
 
 ## Prerequisites
 - Flutter 3.7.0 or newer (`flutter --version` to confirm)
-- Node.js 16+ (needed for the Amplify CLI)
-- AWS CLI configured with an IAM user/role that can create Cognito/AppSync resources (`aws configure`)
+- Node.js 20+ (aligns with the latest Amplify CLI overrides tooling)
+- AWS CLI configured with an IAM user/role that can create Cognito resources (`aws configure`)
 - Amplify CLI (`npm install -g @aws-amplify/cli`)
 - Xcode (for iOS) and/or Android Studio SDK/NDK (for Android)
 
@@ -22,31 +22,35 @@ flutter pub get
    ```bash
    amplify init
    ```
-   - Choose **Flutter** as the default editor, **iOS/Android** (or Web) as platforms, and pick your AWS profile.
+   - Choose **Flutter** as the default editor, enable iOS/Android (and Web if needed), then pick your AWS profile.
 
 2. Add the Cognito auth resource:
    ```bash
    amplify add auth
    ```
-   - When prompted, pick **Default configuration with Social Provider** (or another preset) and configure sign-in alias (email), password policy, MFA, etc., to match your requirements.
+   - Select **Walkthrough all the auth configurations** so you can set email + phone sign-in and update password policy/MFA as needed. The custom attributes will be added in the console after the initial push.
 
-3. Push the backend:
+3. Deploy the baseline backend:
    ```bash
    amplify push
    ```
-   - This creates the Cognito User Pool, Identity Pool, and generates the Amplify configuration file under `amplify/backend/`.
-4. Add custom profile attributes (title, organization):
-   - Before running `amplify push`, open `amplify/backend/auth/<resource-name>/cli-inputs.json` and add entries under `userPoolConfig -> schemaAttributes`, e.g.:
-     ```json
-     {
-       "name": "custom:title",
-       "required": false,
-       "mutable": true,
-       "attributeDataType": "String",
-       "stringAttributeConstraints": { "minLength": "1", "maxLength": "256" }
-     }
-     ```
-   - Repeat for `custom:organization`. If you already pushed, add them in the Cognito console (User pool → Attributes → Add custom attribute), then run `amplify pull` to sync the local project.
+   - This provisions the Cognito User Pool/Identity Pool and uploads the generated configuration to S3.
+
+4. Add the required custom profile attributes via the Cognito console:
+   - Open the Amplify-generated user pool (Console → Cognito → User pools → select your pool).
+   - Under **Attributes → Add custom attribute**, create `title` and `organization` (String, mutable, required to match the app form, max length 256).
+   - Save and confirm the pool now lists `custom:title` and `custom:organization`.
+
+5. Authorize the app clients to use the attributes:
+   - Still in the Cognito console, edit each app client (native and web if present).
+   - Under **Attribute read and write permissions**, ensure `custom:title` and `custom:organization` are checked for both readable and writable lists, alongside `email`, `phone_number`, `given_name`, and `family_name`.
+   - Save the app client changes.
+
+6. Pull the updated backend metadata locally:
+   ```bash
+   amplify pull
+   ```
+   - This refreshes `amplify/backend/auth/*/cli-inputs.json`, `parameters.json`, and `team-provider-info.json` so the repo reflects the console changes.
 
 ## 3. Update the Flutter config
 1. Copy the generated values from `amplify/team-provider-info.json` or `amplify/backend/amplify-meta.json` into `lib/amplifyconfiguration.dart`.  
@@ -58,6 +62,7 @@ flutter pub get
    "cognito_identity_pool_id": "us-east-1:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
    ```
 2. For apps with an App Client secret disabled (recommended for native apps), remove the `AppClientSecret` property completely.
+3. Verify that the `authapp1` app clients in Cognito expose `custom:title` and `custom:organization`; if you make changes later, rerun `amplify pull` and update this file again.
 
 ## 4. Platform-specific setup
 ### iOS
@@ -71,7 +76,7 @@ flutter pub get
 - Run `cd ios && pod install && cd ..` after any dependency changes.
 
 ### Android
-- Ensure `android/app/build.gradle` has `minSdkVersion 23` (required by `local_auth` and Amplify).
+- Ensure `android/app/build.gradle.kts` sets `minSdk = 23` (required by `local_auth` and Amplify).
 - If using biometric auth, confirm `android/app/src/main/AndroidManifest.xml` includes:
   ```xml
   <uses-permission android:name="android.permission.USE_BIOMETRIC" />
@@ -110,6 +115,7 @@ flutter run
 - **`AmplifyAlreadyConfiguredException`**: Safe to ignore; the app protects against double configuration.
 - **Biometric sign-in fails**: Check that `local_auth` is correctly configured per platform and that the device supports biometrics.
 - **Widgets tests failing**: Update or remove the default `widget_test.dart`; it still references the counter template.
+- **`NotAuthorizedException: attempted to write unauthorized attribute`**: Confirm the Cognito app client allows read/write access to `custom:title` and `custom:organization`, then run `amplify pull` so local configs stay in sync.
 
 - **Styling tweaks**: Update `lib/theme/app_theme.dart` for shared colors, typography, and spacing. Auth screens reuse `AuthScaffold` (`lib/theme/layout/auth_layout.dart`) so downstream apps can swap themes without rewriting forms.
 - **CI/CD templates**: Use the provided workflows:
