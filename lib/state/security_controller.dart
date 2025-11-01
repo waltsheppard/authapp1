@@ -83,8 +83,12 @@ class SecurityController extends StateNotifier<SecurityState> {
       state = state.copyWith(firstCheckComplete: true);
       return;
     }
-    lock();
-    await requestUnlock(reason: 'Unlock to continue');
+    if (!state.isUnlocked && !state.authInProgress && !state.requiresPin) {
+      await requestUnlock(reason: 'Unlock to continue');
+    } else {
+      recordUserActivity();
+      state = state.copyWith(firstCheckComplete: true);
+    }
   }
 
   void handleAppPaused() {
