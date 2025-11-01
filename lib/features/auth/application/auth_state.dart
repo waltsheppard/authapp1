@@ -33,10 +33,6 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return ref.watch(_authRepositoryImplProvider);
 });
 
-final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
-  return ref.watch(_authRepositoryImplProvider);
-});
-
 final credentialStorageProvider = Provider<CredentialStorage>((ref) => CredentialStorage());
 
 final biometricServiceProvider = Provider<BiometricService>((ref) => BiometricService());

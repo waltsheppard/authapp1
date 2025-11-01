@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:authapp1/features/auth/auth.dart';
+import 'package:authapp1/security/inactivity_guard.dart';
+import 'package:authapp1/security/security_gate.dart';
 import 'package:authapp1/theme/app_theme.dart';
 import 'config/app_environment.dart';
 import 'amplifyconfiguration.dart';
@@ -43,6 +45,11 @@ class _MyAppState extends ConsumerState<MyApp> {
     return MaterialApp(
       title: 'Auth App',
       theme: AppTheme.light(),
+      builder: (context, child) => SecurityGate(
+        child: InactivityGuard(
+          child: child ?? const SizedBox.shrink(),
+        ),
+      ),
       home: const SplashScreen(),
       debugShowCheckedModeBanner: widget.environment != AppEnvironment.prod,
     );

@@ -122,11 +122,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       email: _emailController.text.trim(),
       rememberMe: _rememberMe,
     );
+    final requiresVerification = await _checkContactVerification();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      MaterialPageRoute(
+        builder: (_) => HomeScreen(requiresContactVerification: requiresVerification),
+      ),
       (route) => false,
     );
+  }
+
+  Future<bool> _checkContactVerification() async {
+    try {
+      final attributes = await Amplify.Auth.fetchUserAttributes();
+      bool emailVerified = true;
+      bool phoneVerified = true;
+      for (final attribute in attributes) {
+        final key = attribute.userAttributeKey.key;
+        if (key == 'email_verified') {
+          emailVerified = attribute.value.toLowerCase() == 'true';
+        } else if (key == 'phone_number_verified') {
+          phoneVerified = attribute.value.toLowerCase() == 'true';
+        }
+      }
+      return !(emailVerified && phoneVerified);
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> _biometricLogin() async {
@@ -154,8 +176,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final session = await _sessionManager.currentSession();
       if (session.isSignedIn) {
         if (!mounted) return;
+        final requiresVerification = await _checkContactVerification();
+        if (!mounted) return;
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(
+            builder: (_) => HomeScreen(requiresContactVerification: requiresVerification),
+          ),
           (route) => false,
         );
         return;
@@ -292,14 +318,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   onPressed: _forgotPassword,
                   child: const Text('Forgot password?'),
                 ),
-            TextButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SignupScreen()),
-                    );
-                  },
-                  child: const Text('Create an account'),
-                ),
+            const SizedBox(height: AppSpacing.md),
+            const Text(
+              'Accounts are provisioned by your administrator. '
+              'Contact your on-call support team if you need access or updates.',
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),

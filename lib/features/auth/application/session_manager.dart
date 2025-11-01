@@ -2,6 +2,15 @@ import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:authapp1/features/auth/auth.dart';
 
+class PinValidationException implements Exception {
+  const PinValidationException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'PinValidationException: $message';
+}
+
 class SessionManager {
   SessionManager(this._ref);
 
@@ -10,6 +19,29 @@ class SessionManager {
   AuthRepository get _authRepository => _ref.read(authRepositoryProvider);
   CredentialStorage get _storage => _ref.read(credentialStorageProvider);
   AuthConfig get _config => _ref.read(authConfigProvider);
+
+  Future<bool> hasPin() => _storage.hasPin();
+
+  Future<void> updatePin({
+    String? currentPin,
+    required String newPin,
+  }) async {
+    final hasExisting = await hasPin();
+    if (hasExisting) {
+      if (currentPin == null || currentPin.isEmpty) {
+        throw const PinValidationException('Current PIN required');
+      }
+      final valid = await _storage.verifyPin(currentPin);
+      if (!valid) {
+        throw const PinValidationException('Current PIN is incorrect');
+      }
+    }
+    await _storage.savePin(newPin);
+  }
+
+  Future<bool> verifyPin(String pin) => _storage.verifyPin(pin);
+
+  Future<void> clearPin() => _storage.clearPin();
 
   Future<bool> isRememberMeEnabled() async {
     final stored = await _storage.readRememberMe();

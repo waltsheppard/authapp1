@@ -9,40 +9,6 @@ class AuthService {
     }
   }
 
-  Future<SignUpResult> signUp({
-    required String email,
-    required String password,
-    required String phoneNumber,
-    required String title,
-    required String firstName,
-    required String lastName,
-    required String organization,
-  }) async {
-    final userAttributes = {
-      CognitoUserAttributeKey.email: email,
-      CognitoUserAttributeKey.phoneNumber: phoneNumber,
-      CognitoUserAttributeKey.givenName: firstName,
-      CognitoUserAttributeKey.familyName: lastName,
-      CognitoUserAttributeKey.custom('title'): title,
-      CognitoUserAttributeKey.custom('organization'): organization,
-    };
-    return await Amplify.Auth.signUp(
-      username: email,
-      password: password,
-      options: SignUpOptions(userAttributes: userAttributes),
-    );
-  }
-
-  Future<SignUpResult> confirmSignUp({
-    required String email,
-    required String code,
-  }) async {
-    return await Amplify.Auth.confirmSignUp(
-      username: email,
-      confirmationCode: code,
-    );
-  }
-
   Future<SignInResult> signIn({
     required String email,
     required String password,
@@ -75,81 +41,8 @@ class AuthService {
     );
   }
 
-  Future<UpdateUserAttributeResult> updateEmail(String email) async {
-    return Amplify.Auth.updateUserAttribute(
-      userAttributeKey: CognitoUserAttributeKey.email,
-      value: email,
-    );
-  }
-
-  Future<UpdateUserAttributeResult> updatePhone(String phoneNumber) async {
-    return Amplify.Auth.updateUserAttribute(
-      userAttributeKey: CognitoUserAttributeKey.phoneNumber,
-      value: phoneNumber,
-    );
-  }
-
-  Future<void> confirmAttribute({
-    required CognitoUserAttributeKey key,
-    required String code,
-  }) async {
-    await Amplify.Auth.confirmUserAttribute(
-      userAttributeKey: key,
-      confirmationCode: code,
-    );
-  }
-
   Future<void> deleteUser() async {
     await Amplify.Auth.deleteUser();
-  }
-
-  Future<List<AuthUserAttribute>> fetchUserAttributes() async {
-    return Amplify.Auth.fetchUserAttributes();
-  }
-
-  Future<List<AuthUserAttribute>> updateProfileAttributes({
-    String? title,
-    String? firstName,
-    String? lastName,
-    String? organization,
-  }) async {
-    final List<AuthUserAttribute> attrs = [];
-    if (firstName != null) {
-      attrs.add(
-        AuthUserAttribute(
-          userAttributeKey: CognitoUserAttributeKey.givenName,
-          value: firstName,
-        ),
-      );
-    }
-    if (lastName != null) {
-      attrs.add(
-        AuthUserAttribute(
-          userAttributeKey: CognitoUserAttributeKey.familyName,
-          value: lastName,
-        ),
-      );
-    }
-    if (title != null) {
-      attrs.add(
-        AuthUserAttribute(
-          userAttributeKey: CognitoUserAttributeKey.custom('title'),
-          value: title,
-        ),
-      );
-    }
-    if (organization != null) {
-      attrs.add(
-        AuthUserAttribute(
-          userAttributeKey: CognitoUserAttributeKey.custom('organization'),
-          value: organization,
-        ),
-      );
-    }
-    if (attrs.isEmpty) return fetchUserAttributes();
-    await Amplify.Auth.updateUserAttributes(attributes: attrs);
-    // Return refreshed attributes after update
-    return fetchUserAttributes();
   }
 
   Future<SignInResult> confirmSignIn(String confirmationValue) async {
@@ -164,11 +57,4 @@ class AuthService {
     return Amplify.Auth.resendSignUpCode(username: username);
   }
 
-  Future<SendUserAttributeVerificationCodeResult> resendAttributeCode({
-    required CognitoUserAttributeKey key,
-  }) async {
-    return Amplify.Auth.sendUserAttributeVerificationCode(
-      userAttributeKey: key,
-    );
-  }
 }

@@ -13,13 +13,12 @@ import 'package:authapp1/features/auth/auth.dart';
 import 'package:authapp1/main.dart';
 import 'package:authapp1/screens/splash_screen.dart';
 
-class _FakeAuthRepository implements AuthRepository, ProfileRepository {
+class _FakeAuthRepository implements AuthRepository {
   const _FakeAuthRepository();
 
   @override
   Future<void> configure() async {}
 
-  @override
   @override
   Future<CognitoAuthSession> fetchSession() async =>
       Future.error(const SignedOutException('User not signed in'));
@@ -35,23 +34,6 @@ class _FakeAuthRepository implements AuthRepository, ProfileRepository {
       Future.error(UnimplementedError());
 
   @override
-  Future<SignUpResult> signUp({
-    required String email,
-    required String password,
-    required String phone,
-    required String title,
-    required String firstName,
-    required String lastName,
-    required String organization,
-  }) => Future.error(UnimplementedError());
-
-  @override
-  Future<SignUpResult> confirmSignUp({
-    required String email,
-    required String code,
-  }) => Future.error(UnimplementedError());
-
-  @override
   Future<ResetPasswordResult> requestPasswordReset(String username) =>
       Future.error(UnimplementedError());
 
@@ -64,36 +46,6 @@ class _FakeAuthRepository implements AuthRepository, ProfileRepository {
 
   @override
   Future<void> deleteUser() => Future.error(UnimplementedError());
-
-  @override
-  Future<List<AuthUserAttribute>> fetchAttributes() async => const [];
-
-  @override
-  Future<List<AuthUserAttribute>> updateProfileAttributes({
-    String? title,
-    String? firstName,
-    String? lastName,
-    String? organization,
-  }) => Future.error(UnimplementedError());
-
-  @override
-  Future<UpdateUserAttributeResult> updateEmail(String email) =>
-      Future.error(UnimplementedError());
-
-  @override
-  Future<UpdateUserAttributeResult> updatePhone(String phone) =>
-      Future.error(UnimplementedError());
-
-  @override
-  Future<void> confirmAttribute({
-    required CognitoUserAttributeKey key,
-    required String code,
-  }) => Future.error(UnimplementedError());
-
-  @override
-  Future<SendUserAttributeVerificationCodeResult> resendAttributeCode({
-    required CognitoUserAttributeKey key,
-  }) => Future.error(UnimplementedError());
 }
 
 void main() {
@@ -103,7 +55,6 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(fakeRepository),
-          profileRepositoryProvider.overrideWithValue(fakeRepository),
         ],
         child: const MyApp(environment: AppEnvironment.dev),
       ),

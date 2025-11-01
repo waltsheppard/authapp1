@@ -28,7 +28,7 @@ flutter pub get
    ```bash
    amplify add auth
    ```
-   - Select **Walkthrough all the auth configurations** so you can set email + phone sign-in and update password policy/MFA as needed. The custom attributes will be added in the console after the initial push.
+   - Select **Walkthrough all the auth configurations** so you can set email + phone sign-in and update password policy/MFA as needed.
 
 3. Deploy the baseline backend:
    ```bash
@@ -36,17 +36,7 @@ flutter pub get
    ```
    - This provisions the Cognito User Pool/Identity Pool and uploads the generated configuration to S3.
 
-4. Add the required custom profile attributes via the Cognito console:
-   - Open the Amplify-generated user pool (Console → Cognito → User pools → select your pool).
-   - Under **Attributes → Add custom attribute**, create `title` and `organization` (String, mutable, required to match the app form, max length 256).
-   - Save and confirm the pool now lists `custom:title` and `custom:organization`.
-
-5. Authorize the app clients to use the attributes:
-   - Still in the Cognito console, edit each app client (native and web if present).
-   - Under **Attribute read and write permissions**, ensure `custom:title` and `custom:organization` are checked for both readable and writable lists, alongside `email`, `phone_number`, `given_name`, and `family_name`.
-   - Save the app client changes.
-
-6. Pull the updated backend metadata locally:
+4. Pull the updated backend metadata locally:
    ```bash
    amplify pull
    ```
@@ -62,7 +52,7 @@ flutter pub get
    "cognito_identity_pool_id": "us-east-1:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
    ```
 2. For apps with an App Client secret disabled (recommended for native apps), remove the `AppClientSecret` property completely.
-3. Verify that the `authapp1` app clients in Cognito expose `custom:title` and `custom:organization`; if you make changes later, rerun `amplify pull` and update this file again.
+3. Confirm that the Cognito app client exposes `email`, `phone_number`, and the verification flags; if you make changes later, rerun `amplify pull` and update this file again.
 
 ## 4. Platform-specific setup
 ### iOS
@@ -87,7 +77,7 @@ flutter pub get
 ```bash
 flutter run
 ```
-- The splash screen calls Amplify configuration automatically; on success, you should land on the login screen and be able to sign up / sign in against your Cognito user pool.
+- The splash screen configures Amplify automatically; on success, you should land on the login screen. Accounts are provisioned centrally—use the username/password provided by your administrator. First-time users will be prompted to set a new password and confirm their contact details.
 
 ## 6. Managing environments
 - Use `amplify env add` to create additional AWS environments (e.g., dev/stage/prod).
@@ -115,13 +105,28 @@ flutter run
 - **`AmplifyAlreadyConfiguredException`**: Safe to ignore; the app protects against double configuration.
 - **Biometric sign-in fails**: Check that `local_auth` is correctly configured per platform and that the device supports biometrics.
 - **Widgets tests failing**: Update or remove the default `widget_test.dart`; it still references the counter template.
-- **`NotAuthorizedException: attempted to write unauthorized attribute`**: Confirm the Cognito app client allows read/write access to `custom:title` and `custom:organization`, then run `amplify pull` so local configs stay in sync.
+- **`NotAuthorizedException: attempted to write unauthorized attribute`**: Typically appears if an admin disables the required attributes in Cognito. Re-enable email/phone updates (or remove them from the client permissions) and run `amplify pull`.
 
 - **Styling tweaks**: Update `lib/theme/app_theme.dart` for shared colors, typography, and spacing. Auth screens reuse `AuthScaffold` (`lib/theme/layout/auth_layout.dart`) so downstream apps can swap themes without rewriting forms.
 - **CI/CD templates**: Use the provided workflows:
   - `.github/workflows/ci.yml` – main branch validation (format, analyze, test, Android release build).
   - `.github/workflows/cd-android.yml` – manual deploy template with keystore + Play Store placeholders.
   - `.github/workflows/cd-ios.yml` – manual deploy template with signing asset placeholders.
+
+## 10. Security controls
+- **Device attestation**: The app blocks rooted/jailbroken, emulator, and mock-location devices (see `safe_device` checks in `lib/state/security_controller.dart`). For development builds (`flutter run`), the guard is relaxed; release builds enforce it.
+- **OS passcode/biometric enforcement**: On launch/resume the session gate (`lib/security/security_gate.dart`) requires LocalAuth to succeed with biometric or device passcode. Devices without a secure lock screen are rejected with remediation guidance.
+- **Idle session lock**: User interaction is monitored via `InactivityGuard`; after two minutes of inactivity the session locks and re-prompts for authentication. Backgrounding the app immediately locks the session.
+- **Sign-out fallback**: When access is blocked or the user can’t re-authenticate, the security screen offers a managed sign-out that clears local credentials while preserving “Remember me” preference.
+- **Operational checklist**: Pair these client controls with MDM enforcement, Cognito MFA, audit logging, and incident response policies before handling PHI in production.
+- **Profile settings**: The in-app profile only exposes password rotation and security PIN management; email/phone changes and contact verification remain administrator workflows in Cognito.
+
+## 11. User provisioning
+- **Create users centrally** using the Cognito console, CLI (`amplify auth add-user`), or AdminCreateUser API. Supply email and phone so preprovisioned accounts match the app’s required attributes.
+- **Distribute temporary credentials** to clinicians and require them to set a new password at first login. The app already handles the `NEW_PASSWORD_REQUIRED` challenge during sign-in.
+- **Contact verification**: First login triggers an email/SMS code challenge; the home screen also reminds users to verify their contact info until both email and phone are confirmed. Administrators can resend verification codes from Cognito if needed.
+- **Profile updates**: Clinicians can change their Cognito password from the Profile screen and set/reset the app security PIN; all other profile edits (name, title, contact changes) are handled centrally by administrators.
+- **Disable self sign-up** in Cognito (no Hosted UI) and keep the app’s self-registration UI hidden, ensuring only pre-authorized staff receive access.
 
 For deeper customization, review the official docs:
 - [Amplify Flutter Auth Guide](https://docs.amplify.aws/flutter/build-a-backend/auth/)

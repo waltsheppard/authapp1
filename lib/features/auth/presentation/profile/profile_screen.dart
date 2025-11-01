@@ -1,9 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
-import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import 'package:authapp1/features/auth/auth.dart';
 import 'package:authapp1/theme/app_theme.dart';
 import 'package:authapp1/theme/layout/auth_layout.dart';
@@ -16,444 +13,310 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _codeController = TextEditingController();
-  final _titleController = TextEditingController();
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
-  final _organizationController = TextEditingController();
+  final _passwordFormKey = GlobalKey<FormState>();
+  final _pinFormKey = GlobalKey<FormState>();
 
-  CognitoUserAttributeKey? _pendingAttributeKey;
-  late final SessionManager _sessionManager;
-  int _resendCooldown = 0;
-  Timer? _cooldownTimer;
+  final _currentPasswordController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  final _currentPinController = TextEditingController();
+  final _newPinController = TextEditingController();
+  final _confirmPinController = TextEditingController();
+
+  bool _changingPassword = false;
+  bool _updatingPin = false;
+  bool _hasPin = false;
 
   @override
   void initState() {
     super.initState();
-    _sessionManager = ref.read(sessionManagerProvider);
-    _loadAttributes();
-  }
-
-  Future<void> _loadAttributes() async {
-    try {
-      await ref.read(profileControllerProvider.notifier).loadAttributes();
-    } catch (_) {}
-  }
-
-  void _applyAttributes(List<AuthUserAttribute> attrs) {
-    for (final attribute in attrs) {
-      final value = attribute.value;
-      if (attribute.userAttributeKey == CognitoUserAttributeKey.email) {
-        if (_emailController.text != value) {
-          _emailController.text = value;
-        }
-      } else if (attribute.userAttributeKey ==
-          CognitoUserAttributeKey.phoneNumber) {
-        if (_phoneController.text != value) {
-          _phoneController.text = value;
-        }
-      } else if (attribute.userAttributeKey ==
-          CognitoUserAttributeKey.givenName) {
-        if (_firstNameController.text != value) {
-          _firstNameController.text = value;
-        }
-      } else if (attribute.userAttributeKey ==
-          CognitoUserAttributeKey.familyName) {
-        if (_lastNameController.text != value) {
-          _lastNameController.text = value;
-        }
-      } else if (attribute.userAttributeKey.key == 'custom:title') {
-        if (_titleController.text != value) {
-          _titleController.text = value;
-        }
-      } else if (attribute.userAttributeKey.key == 'custom:organization') {
-        if (_organizationController.text != value) {
-          _organizationController.text = value;
-        }
-      }
-    }
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  Future<void> _updateEmail() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty) return;
-    final controller = ref.read(profileControllerProvider.notifier);
-    try {
-      final res = await controller.updateEmail(email);
-      if (res.nextStep.updateAttributeStep ==
-          AuthUpdateAttributeStep.confirmAttributeWithCode) {
-        _pendingAttributeKey = CognitoUserAttributeKey.email;
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Verification code sent via SMS.')),
-        );
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Email updated.')));
-      }
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.message)));
-    }
-  }
-
-  Future<void> _updatePhone() async {
-    final phone = _phoneController.text.trim();
-    if (phone.isEmpty) return;
-    final controller = ref.read(profileControllerProvider.notifier);
-    try {
-      final res = await controller.updatePhone(phone);
-      if (res.nextStep.updateAttributeStep ==
-          AuthUpdateAttributeStep.confirmAttributeWithCode) {
-        _pendingAttributeKey = CognitoUserAttributeKey.phoneNumber;
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Verification code sent via Email.')),
-        );
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Phone updated.')));
-      }
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.message)));
-    }
-  }
-
-  Future<void> _confirm() async {
-    final code = _codeController.text.trim();
-    if (code.isEmpty || _pendingAttributeKey == null) return;
-    final controller = ref.read(profileControllerProvider.notifier);
-    try {
-      await controller.confirmAttribute(key: _pendingAttributeKey!, code: code);
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Attribute confirmed.')));
-      _pendingAttributeKey = null;
-      _codeController.clear();
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.message)));
-    }
-  }
-
-  Future<void> _resendAttributeCode() async {
-    if (_pendingAttributeKey == null) return;
-    try {
-      await ref
-          .read(profileControllerProvider.notifier)
-          .resendAttributeCode(_pendingAttributeKey!);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Verification code resent.')),
-      );
-      _startCooldown(30);
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(_friendlyError(e))));
-    }
-  }
-
-  void _startCooldown(int seconds) {
-    _cooldownTimer?.cancel();
-    setState(() => _resendCooldown = seconds);
-    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) return;
-      if (_resendCooldown <= 1) {
-        t.cancel();
-        setState(() => _resendCooldown = 0);
-      } else {
-        setState(() => _resendCooldown -= 1);
-      }
-    });
-  }
-
-  String _friendlyError(AuthException e) {
-    final msg = e.message;
-    if (msg.contains('AliasExistsException')) {
-      return 'That email/phone is already in use.';
-    }
-    if (msg.contains('TooManyRequestsException')) {
-      return 'Too many attempts. Please try again shortly.';
-    }
-    if (msg.contains('CodeMismatchException')) {
-      return 'Incorrect verification code.';
-    }
-    if (msg.contains('ExpiredCodeException')) {
-      return 'Verification code expired. Request a new one.';
-    }
-    return msg;
+    _loadPinState();
   }
 
   @override
   void dispose() {
-    _cooldownTimer?.cancel();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _codeController.dispose();
-    _titleController.dispose();
-    _firstNameController.dispose();
-    _lastNameController.dispose();
-    _organizationController.dispose();
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    _currentPinController.dispose();
+    _newPinController.dispose();
+    _confirmPinController.dispose();
     super.dispose();
   }
 
-  Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) return;
-    final controller = ref.read(profileControllerProvider.notifier);
+  Future<void> _loadPinState() async {
+    final hasPin = await ref.read(profileControllerProvider.notifier).hasPin();
+    if (mounted) {
+      setState(() => _hasPin = hasPin);
+    }
+  }
+
+  Future<void> _changePassword() async {
+    if (!_passwordFormKey.currentState!.validate()) return;
+    setState(() => _changingPassword = true);
+    final messenger = ScaffoldMessenger.of(context);
     try {
-      await controller.updateProfile(
-        title:
-            _titleController.text.trim().isEmpty
-                ? null
-                : _titleController.text.trim(),
-        firstName:
-            _firstNameController.text.trim().isEmpty
-                ? null
-                : _firstNameController.text.trim(),
-        lastName:
-            _lastNameController.text.trim().isEmpty
-                ? null
-                : _lastNameController.text.trim(),
-        organization:
-            _organizationController.text.trim().isEmpty
-                ? null
-                : _organizationController.text.trim(),
-      );
+      await ref.read(profileControllerProvider.notifier).changePassword(
+            currentPassword: _currentPasswordController.text,
+            newPassword: _newPasswordController.text,
+          );
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Profile saved.')));
+      _currentPasswordController.clear();
+      _newPasswordController.clear();
+      _confirmPasswordController.clear();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Password updated.')),
+      );
     } on AuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.message)));
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Unable to update password. Try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _changingPassword = false);
     }
+  }
+
+  Future<void> _updatePin() async {
+    if (!_pinFormKey.currentState!.validate()) return;
+    setState(() => _updatingPin = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(profileControllerProvider.notifier).updatePin(
+            currentPin: _hasPin ? _currentPinController.text.trim() : null,
+            newPin: _newPinController.text.trim(),
+          );
+      if (!mounted) return;
+      _currentPinController.clear();
+      _newPinController.clear();
+      _confirmPinController.clear();
+      await _loadPinState();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Security PIN updated.')),
+      );
+    } on PinValidationException catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Unable to update PIN. Try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _updatingPin = false);
+    }
+  }
+
+  Future<void> _removePin() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove security PIN'),
+        content: const Text('Removing your PIN disables app unlock via PIN. Continue?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (confirmed != true) return;
+    setState(() => _updatingPin = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(profileControllerProvider.notifier).removePin();
+      if (!mounted) return;
+      _currentPinController.clear();
+      _newPinController.clear();
+      _confirmPinController.clear();
+      await _loadPinState();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Security PIN removed.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Unable to remove PIN. Try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _updatingPin = false);
+    }
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) return 'Enter a password';
+    final minLength = ref.read(authConfigProvider).passwordMinLength;
+    if (value.length < minLength) {
+      return 'Minimum $minLength characters';
+    }
+    return null;
+  }
+
+  String? _validatePin(String? value) {
+    final v = value?.trim() ?? '';
+    if (v.isEmpty) return 'Enter a PIN';
+    if (v.length < 4) return 'PIN must be at least 4 digits';
+    if (v.length > 6) return 'PIN must be 4-6 digits';
+    if (!RegExp(r'^\d+$').hasMatch(v)) return 'Use digits only';
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<AsyncValue<List<AuthUserAttribute>>>(
-      profileControllerProvider,
-      (previous, next) => next.whenData(_applyAttributes),
-    );
-    final profileState = ref.watch(profileControllerProvider);
-    final isBusy = profileState.isLoading;
-    final config = ref.watch(authConfigProvider);
+    final padding = MediaQuery.of(context).size.width > 640 ? const EdgeInsets.symmetric(horizontal: 120) : const EdgeInsets.symmetric(horizontal: 24);
     return AuthScaffold(
-      title: 'Profile settings',
-      maxContentWidth: 560,
-      child: Form(
-        key: _formKey,
+      title: 'Account security',
+      child: SingleChildScrollView(
+        padding: padding.copyWith(bottom: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (isBusy) ...[
-              const LinearProgressIndicator(),
-              const SizedBox(height: AppSpacing.sm),
-            ],
-            if (profileState.hasError)
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: Text(
-                  'We couldn\'t refresh your profile. Try again shortly.',
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ),
-            TextFormField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: 'Title',
-                border: OutlineInputBorder(),
-              ),
-              validator:
-                  (v) =>
-                      (v == null || v.trim().isEmpty)
-                          ? 'Title is required'
-                          : null,
+            const Text(
+              'Update password',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: AppSpacing.sm),
-            TextFormField(
-              controller: _firstNameController,
-              decoration: const InputDecoration(
-                labelText: 'First name',
-                border: OutlineInputBorder(),
+            Form(
+              key: _passwordFormKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextFormField(
+                    controller: _currentPasswordController,
+                    decoration: const InputDecoration(
+                      labelText: 'Current password',
+                      border: OutlineInputBorder(),
+                    ),
+                    obscureText: true,
+                    validator: (value) =>
+                        (value == null || value.isEmpty) ? 'Enter current password' : null,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextFormField(
+                    controller: _newPasswordController,
+                    decoration: const InputDecoration(
+                      labelText: 'New password',
+                      border: OutlineInputBorder(),
+                    ),
+                    obscureText: true,
+                    validator: _validatePassword,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm new password',
+                      border: OutlineInputBorder(),
+                    ),
+                    obscureText: true,
+                    validator: (value) {
+                      if (value != _newPasswordController.text) {
+                        return 'Passwords do not match';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  ElevatedButton(
+                    onPressed: _changingPassword ? null : _changePassword,
+                    child: _changingPassword
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Update password'),
+                  ),
+                ],
               ),
-              validator:
-                  (v) =>
-                      (v == null || v.trim().isEmpty)
-                          ? 'First name is required'
-                          : null,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            TextFormField(
-              controller: _lastNameController,
-              decoration: const InputDecoration(
-                labelText: 'Last name',
-                border: OutlineInputBorder(),
-              ),
-              validator:
-                  (v) =>
-                      (v == null || v.trim().isEmpty)
-                          ? 'Last name is required'
-                          : null,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            TextFormField(
-              controller: _organizationController,
-              decoration: const InputDecoration(
-                labelText: 'Organization',
-                border: OutlineInputBorder(),
-              ),
-              validator:
-                  (v) =>
-                      (v == null || v.trim().isEmpty)
-                          ? 'Organization is required'
-                          : null,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            ElevatedButton(
-              onPressed: isBusy ? null : _saveProfile,
-              child: const Text('Save profile'),
-            ),
-            const Divider(height: AppSpacing.xl),
-            TextFormField(
-              controller: _emailController,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.emailAddress,
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Email is required';
-                if (!config.emailRegex.hasMatch(v.trim())) {
-                  return 'Enter a valid email';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            ElevatedButton(
-              onPressed: isBusy ? null : _updateEmail,
-              child: const Text('Update email'),
             ),
             const SizedBox(height: AppSpacing.lg),
-            TextFormField(
-              controller: _phoneController,
-              decoration: const InputDecoration(
-                labelText: 'Phone (+E.164)',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.phone,
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Phone is required';
-                if (!config.phoneRegex.hasMatch(v.trim())) {
-                  return 'Enter phone in E.164 (e.g., +15551234567)';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            ElevatedButton(
-              onPressed: isBusy ? null : _updatePhone,
-              child: const Text('Update phone'),
-            ),
+            const Divider(),
             const SizedBox(height: AppSpacing.lg),
-            TextField(
-              controller: _codeController,
-              decoration: const InputDecoration(
-                labelText: 'Verification code',
-                border: OutlineInputBorder(),
-              ),
+            const Text(
+              'Manage security PIN',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: AppSpacing.sm),
-            OutlinedButton(
-              onPressed: isBusy ? null : _confirm,
-              child: const Text('Confirm change'),
+            const Text(
+              'Use a 4-6 digit PIN as a fallback unlock method when biometrics are unavailable. ',
             ),
-            TextButton(
-              onPressed:
-                  isBusy || _resendCooldown > 0 ? null : _resendAttributeCode,
-              child: Text(
-                _resendCooldown > 0
-                    ? 'Resend code (${_resendCooldown}s)'
-                    : 'Resend code',
+            const SizedBox(height: AppSpacing.sm),
+            Form(
+              key: _pinFormKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_hasPin) ...[
+                    TextFormField(
+                      controller: _currentPinController,
+                      decoration: const InputDecoration(
+                        labelText: 'Current PIN',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                      obscureText: true,
+                      maxLength: 6,
+                      validator: _validatePin,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
+                  TextFormField(
+                    controller: _newPinController,
+                    decoration: const InputDecoration(
+                      labelText: 'New PIN',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                    obscureText: true,
+                    maxLength: 6,
+                    validator: _validatePin,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextFormField(
+                    controller: _confirmPinController,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm new PIN',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                    obscureText: true,
+                    maxLength: 6,
+                    validator: (value) {
+                      if (value != _newPinController.text.trim()) {
+                        return 'PIN codes do not match';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  ElevatedButton(
+                    onPressed: _updatingPin ? null : _updatePin,
+                    child: _updatingPin
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(_hasPin ? 'Update PIN' : 'Set PIN'),
+                  ),
+                  if (_hasPin)
+                    TextButton(
+                      onPressed: _updatingPin ? null : _removePin,
+                      child: const Text('Remove PIN'),
+                    ),
+                ],
               ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              onPressed:
-                  isBusy
-                      ? null
-                      : () async {
-                        final messenger = ScaffoldMessenger.of(context);
-                        final navigator = Navigator.of(context);
-                        final confirmed = await showDialog<bool>(
-                          context: context,
-                          builder:
-                              (ctx) => AlertDialog(
-                                title: const Text('Delete account'),
-                                content: const Text(
-                                  'This action is permanent. Are you sure?',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed:
-                                        () => Navigator.of(ctx).pop(false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  TextButton(
-                                    onPressed:
-                                        () => Navigator.of(ctx).pop(true),
-                                    child: const Text('Delete'),
-                                  ),
-                                ],
-                              ),
-                        );
-                        if (confirmed != true) return;
-                        if (!mounted) return;
-                        try {
-                          await ref
-                              .read(profileControllerProvider.notifier)
-                              .deleteAccount();
-                          await _sessionManager.clearStoredCredentials();
-                          if (!mounted) return;
-                          messenger.showSnackBar(
-                            const SnackBar(content: Text('Account deleted')),
-                          );
-                          navigator.popUntil((route) => route.isFirst);
-                        } on AuthException catch (e) {
-                          if (!mounted) return;
-                          messenger.showSnackBar(
-                            SnackBar(content: Text(e.message)),
-                          );
-                        }
-                      },
-              child: const Text('Delete account'),
             ),
           ],
         ),

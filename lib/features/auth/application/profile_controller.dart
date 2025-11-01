@@ -1,98 +1,61 @@
+import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
-import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import 'package:authapp1/features/auth/auth.dart';
 
-class ProfileController extends StateNotifier<AsyncValue<List<AuthUserAttribute>>> {
-  ProfileController(this._ref) : super(const AsyncValue.data(<AuthUserAttribute>[]));
+class ProfileController extends StateNotifier<AsyncValue<void>> {
+  ProfileController(this._ref) : super(const AsyncValue.data(null));
 
   final Ref _ref;
 
-  Future<List<AuthUserAttribute>> loadAttributes() async {
-    state = const AsyncLoading();
-    try {
-      await _ref.read(authRepositoryProvider).configure();
-      final attrs = await _ref.read(profileRepositoryProvider).fetchAttributes();
-      state = AsyncData(attrs);
-      return attrs;
-    } catch (error, stackTrace) {
-      state = AsyncError(error, stackTrace);
-      rethrow;
-    }
-  }
+  SessionManager get _sessionManager => _ref.read(sessionManagerProvider);
 
-  Future<List<AuthUserAttribute>> updateProfile({
-    String? title,
-    String? firstName,
-    String? lastName,
-    String? organization,
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
   }) async {
     state = const AsyncLoading();
     try {
-      final repo = _ref.read(profileRepositoryProvider);
-      final attrs = await repo.updateProfileAttributes(
-        title: title,
-        firstName: firstName,
-        lastName: lastName,
-        organization: organization,
+      await Amplify.Auth.updatePassword(
+        oldPassword: currentPassword,
+        newPassword: newPassword,
       );
-      state = AsyncData(attrs);
-      return attrs;
-    } catch (error, stackTrace) {
+      state = const AsyncValue.data(null);
+    } on AuthException catch (error, stackTrace) {
       state = AsyncError(error, stackTrace);
       rethrow;
     }
   }
 
-  Future<UpdateUserAttributeResult> updateEmail(String email) async {
+  Future<void> updatePin({
+    String? currentPin,
+    required String newPin,
+  }) async {
     state = const AsyncLoading();
     try {
-      final repo = _ref.read(profileRepositoryProvider);
-      final result = await repo.updateEmail(email);
-      state = AsyncData(await repo.fetchAttributes());
-      return result;
+      await _sessionManager.updatePin(currentPin: currentPin, newPin: newPin);
+      state = const AsyncValue.data(null);
     } catch (error, stackTrace) {
       state = AsyncError(error, stackTrace);
       rethrow;
     }
   }
 
-  Future<UpdateUserAttributeResult> updatePhone(String phone) async {
+  Future<void> removePin() async {
     state = const AsyncLoading();
     try {
-      final repo = _ref.read(profileRepositoryProvider);
-      final result = await repo.updatePhone(phone);
-      state = AsyncData(await repo.fetchAttributes());
-      return result;
+      await _sessionManager.clearPin();
+      state = const AsyncValue.data(null);
     } catch (error, stackTrace) {
       state = AsyncError(error, stackTrace);
       rethrow;
     }
   }
 
-  Future<void> confirmAttribute({required CognitoUserAttributeKey key, required String code}) async {
-    state = const AsyncLoading();
-    try {
-      final repo = _ref.read(profileRepositoryProvider);
-      await repo.confirmAttribute(key: key, code: code);
-      state = AsyncData(await repo.fetchAttributes());
-    } catch (error, stackTrace) {
-      state = AsyncError(error, stackTrace);
-      rethrow;
-    }
-  }
-
-  Future<void> resendAttributeCode(CognitoUserAttributeKey key) async {
-    final repo = _ref.read(profileRepositoryProvider);
-    await repo.resendAttributeCode(key: key);
-  }
-
-  Future<void> deleteAccount() async {
-    final repo = _ref.read(authRepositoryProvider);
-    await repo.deleteUser();
-  }
+  Future<bool> hasPin() => _sessionManager.hasPin();
 }
 
-final profileControllerProvider = StateNotifierProvider<ProfileController, AsyncValue<List<AuthUserAttribute>>>(
+final profileControllerProvider =
+    StateNotifierProvider<ProfileController, AsyncValue<void>>(
   (ref) => ProfileController(ref),
 );
