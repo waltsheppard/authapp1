@@ -7,6 +7,121 @@ import 'package:authapp1/widgets/dialogs.dart';
 import 'package:authapp1/theme/app_theme.dart';
 import 'package:authapp1/theme/layout/auth_layout.dart';
 
+
+class _ResetDialogResult {
+  const _ResetDialogResult({required this.code, required this.newPassword});
+
+  final String code;
+  final String newPassword;
+}
+
+class _ResetPasswordDialog extends StatefulWidget {
+  const _ResetPasswordDialog({required this.minPasswordLength});
+
+  final int minPasswordLength;
+
+  @override
+  State<_ResetPasswordDialog> createState() => _ResetPasswordDialogState();
+}
+
+class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _codeController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_submitting) return;
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _submitting = true);
+    Navigator.of(context).pop(
+      _ResetDialogResult(
+        code: _codeController.text.trim(),
+        newPassword: _passwordController.text,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Reset password'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _codeController,
+              decoration: const InputDecoration(
+                labelText: 'Verification code',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+              validator: (value) =>
+                  (value == null || value.trim().isEmpty) ? 'Enter the code' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _passwordController,
+              decoration: const InputDecoration(
+                labelText: 'New password',
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Enter a password';
+                }
+                if (value.length < widget.minPasswordLength) {
+                  return 'Minimum ${widget.minPasswordLength} characters';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _confirmPasswordController,
+              decoration: const InputDecoration(
+                labelText: 'Confirm password',
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+              validator: (value) =>
+                  value == _passwordController.text ? null : 'Passwords do not match',
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _submitting ? null : _submit,
+          child: _submitting
+              ? const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Submit'),
+        ),
+      ],
+    );
+  }
+}
+
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -241,112 +356,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
     final codeController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    bool submitting = false;
-
-    return showDialog<bool>(
+        final result = await showDialog<_ResetDialogResult>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (ctx, setState) {
-            Future<void> submit() async {
-              if (submitting) return;
-              if (!formKey.currentState!.validate()) return;
-              setState(() => submitting = true);
-              try {
-                await ref.read(loginControllerProvider.notifier).confirmPasswordReset(
-                      email: email,
-                      newPassword: newPasswordController.text,
-                      confirmationCode: codeController.text.trim(),
-                    );
-                if (ctx.mounted) Navigator.of(ctx).pop(true);
-              } on AuthException catch (e) {
-                if (!ctx.mounted) return;
-                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.message)));
-                setState(() => submitting = false);
-              }
-            }
-
-            return AlertDialog(
-              title: const Text('Reset password'),
-              content: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: codeController,
-                      decoration: const InputDecoration(
-                        labelText: 'Verification code',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.number,
-                      validator: (value) =>
-                          (value == null || value.trim().isEmpty) ? 'Enter the code' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: newPasswordController,
-                      decoration: const InputDecoration(
-                        labelText: 'New password',
-                        border: OutlineInputBorder(),
-                      ),
-                      obscureText: true,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Enter a password';
-                        }
-                        final minLength = ref.read(authConfigProvider).passwordMinLength;
-                        if (value.length < minLength) {
-                          return 'Minimum $minLength characters';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: confirmPasswordController,
-                      decoration: const InputDecoration(
-                        labelText: 'Confirm password',
-                        border: OutlineInputBorder(),
-                      ),
-                      obscureText: true,
-                      validator: (value) =>
-                          value == newPasswordController.text ? null : 'Passwords do not match',
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: submitting
-                      ? null
-                      : () {
-                          Navigator.of(ctx).pop(false);
-                        },
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: submitting ? null : submit,
-                  child: submitting
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Submit'),
-                ),
-              ],
-            );
-          },
+        return _ResetPasswordDialog(
+          minPasswordLength: ref.read(authConfigProvider).passwordMinLength,
         );
       },
-    ).whenComplete(() {
+    );
+    if (result == null) {
       newPasswordController.dispose();
       confirmPasswordController.dispose();
       codeController.dispose();
-    });
+      return false;
+    }
+    try {
+      await ref.read(loginControllerProvider.notifier).confirmPasswordReset(
+            email: email,
+            newPassword: result.newPassword,
+            confirmationCode: result.code,
+          );
+      return true;
+    } finally {
+      newPasswordController.dispose();
+      confirmPasswordController.dispose();
+      codeController.dispose();
+    }
   }
 
   @override
