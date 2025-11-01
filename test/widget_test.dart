@@ -42,6 +42,13 @@ class _FakeAuthRepository implements AuthRepository {
       Future.error(UnimplementedError());
 
   @override
+  Future<ResetPasswordResult> confirmResetPassword({
+    required String username,
+    required String newPassword,
+    required String confirmationCode,
+  }) => Future.error(UnimplementedError());
+
+  @override
   Future<void> signOut() async {}
 
   @override

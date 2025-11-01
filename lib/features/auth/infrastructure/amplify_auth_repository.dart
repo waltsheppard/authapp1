@@ -25,6 +25,17 @@ class AmplifyAuthRepository implements AuthRepository {
       _service.requestPasswordReset(username);
 
   @override
+  Future<ResetPasswordResult> confirmResetPassword({
+    required String username,
+    required String newPassword,
+    required String confirmationCode,
+  }) => _service.confirmResetPassword(
+        email: username,
+        newPassword: newPassword,
+        confirmationCode: confirmationCode,
+      );
+
+  @override
   Future<ResendSignUpCodeResult> resendSignUpCode(String username) =>
       _service.resendSignUpCode(username);
 

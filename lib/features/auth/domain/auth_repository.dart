@@ -8,6 +8,11 @@ abstract class AuthRepository {
   });
   Future<SignInResult> confirmSignIn(String value);
   Future<ResetPasswordResult> requestPasswordReset(String username);
+  Future<ResetPasswordResult> confirmResetPassword({
+    required String username,
+    required String newPassword,
+    required String confirmationCode,
+  });
   Future<ResendSignUpCodeResult> resendSignUpCode(String username);
   Future<CognitoAuthSession> fetchSession();
   Future<void> signOut();

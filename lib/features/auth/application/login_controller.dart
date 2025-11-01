@@ -49,6 +49,27 @@ class LoginController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  Future<void> confirmPasswordReset({
+    required String email,
+    required String newPassword,
+    required String confirmationCode,
+  }) async {
+    state = const AsyncLoading();
+    try {
+      final repo = _ref.read(authRepositoryProvider);
+      await repo.configure();
+      await repo.confirmResetPassword(
+        username: email,
+        newPassword: newPassword,
+        confirmationCode: confirmationCode,
+      );
+      state = const AsyncData(null);
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+      rethrow;
+    }
+  }
+
   Future<CognitoAuthSession> fetchSession() async {
     final repo = _ref.read(authRepositoryProvider);
     await repo.configure();

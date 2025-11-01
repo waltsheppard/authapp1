@@ -222,15 +222,131 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final controller = ref.read(loginControllerProvider.notifier);
       await controller.requestPasswordReset(email);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reset code sent to your email')),
-      );
+      final success = await _promptForResetConfirmation(email: email);
+      if (!mounted) return;
+      if (success == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password reset successful. Please sign in.')),
+        );
+      }
     } on AuthException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message)),
       );
     }
+  }
+
+  Future<bool?> _promptForResetConfirmation({required String email}) async {
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    final codeController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool submitting = false;
+
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            Future<void> submit() async {
+              if (submitting) return;
+              if (!formKey.currentState!.validate()) return;
+              setState(() => submitting = true);
+              try {
+                await ref.read(loginControllerProvider.notifier).confirmPasswordReset(
+                      email: email,
+                      newPassword: newPasswordController.text,
+                      confirmationCode: codeController.text.trim(),
+                    );
+                if (ctx.mounted) Navigator.of(ctx).pop(true);
+              } on AuthException catch (e) {
+                if (!ctx.mounted) return;
+                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.message)));
+                setState(() => submitting = false);
+              }
+            }
+
+            return AlertDialog(
+              title: const Text('Reset password'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: codeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Verification code',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty) ? 'Enter the code' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: newPasswordController,
+                      decoration: const InputDecoration(
+                        labelText: 'New password',
+                        border: OutlineInputBorder(),
+                      ),
+                      obscureText: true,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Enter a password';
+                        }
+                        final minLength = ref.read(authConfigProvider).passwordMinLength;
+                        if (value.length < minLength) {
+                          return 'Minimum $minLength characters';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: confirmPasswordController,
+                      decoration: const InputDecoration(
+                        labelText: 'Confirm password',
+                        border: OutlineInputBorder(),
+                      ),
+                      obscureText: true,
+                      validator: (value) =>
+                          value == newPasswordController.text ? null : 'Passwords do not match',
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: submitting
+                      ? null
+                      : () {
+                          Navigator.of(ctx).pop(false);
+                        },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: submitting ? null : submit,
+                  child: submitting
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Submit'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      newPasswordController.dispose();
+      confirmPasswordController.dispose();
+      codeController.dispose();
+    });
   }
 
   @override
