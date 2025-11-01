@@ -120,6 +120,8 @@ flutter run
 - **Sign-out fallback**: When access is blocked or the user can’t re-authenticate, the security screen offers a managed sign-out that clears local credentials while preserving “Remember me” preference.
 - **Operational checklist**: Pair these client controls with MDM enforcement, Cognito MFA, audit logging, and incident response policies before handling PHI in production.
 - **Profile settings**: The in-app profile only exposes password rotation and security PIN management; email/phone changes and contact verification remain administrator workflows in Cognito.
+- **Biometric quick sign-in**: By default biometrics simply unlock an existing remembered session; set `allowBiometricCredentialLogin` in `AuthConfig` to `true` if policy allows caching passwords for full biometric login.
+- **Federated login (optional)**: Switch `AuthConfig.authMode` to `AuthMode.saml` for environments that authenticate through Cognito Hosted UI + SAML IdPs (e.g., Microsoft Entra). The login screen swaps to a single "Sign in with Microsoft" button and hides the local password reset flow.
 
 ## 11. User provisioning
 - **Create users centrally** using the Cognito console, CLI (`amplify auth add-user`), or AdminCreateUser API. Supply email and phone so preprovisioned accounts match the app’s required attributes.

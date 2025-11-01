@@ -136,6 +136,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   late final BiometricService _biometricService;
   late final SessionManager _sessionManager;
   bool _biometricsAvailable = false;
+  bool _quickSignInReady = false;
+  bool _samlSigningIn = false;
   late bool _rememberMe;
   bool _obscurePassword = true;
 
@@ -144,8 +146,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.initState();
     _biometricService = ref.read(biometricServiceProvider);
     _sessionManager = ref.read(sessionManagerProvider);
-    _rememberMe = ref.read(authConfigProvider).rememberMeDefault;
-    _checkBiometrics();
+    final config = ref.read(authConfigProvider);
+    _rememberMe = config.rememberMeDefault;
+    if (config.isFederatedLogin) {
+      _biometricsAvailable = false;
+      _quickSignInReady = false;
+    } else {
+      _checkBiometrics();
+    }
+  }
+
+  Future<void> _refreshQuickSignInAvailability() async {
+    final ready = await _sessionManager.canUseQuickSignIn();
+    if (!mounted) return;
+    setState(() => _quickSignInReady = ready);
   }
 
   @override
@@ -159,13 +173,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final available = await _biometricService.canCheckBiometrics();
     final remember = await _sessionManager.isRememberMeEnabled();
     final savedEmail = await _sessionManager.savedEmail();
-    if (mounted) {
-      setState(() {
-        _biometricsAvailable = available;
-        _rememberMe = remember;
-        if (savedEmail != null) _emailController.text = savedEmail;
-      });
-    }
+    final quickReady = await _sessionManager.canUseQuickSignIn();
+    if (!mounted) return;
+    setState(() {
+      _biometricsAvailable = available;
+      _rememberMe = remember;
+      _quickSignInReady = quickReady;
+      if (savedEmail != null) _emailController.text = savedEmail;
+    });
   }
 
   String? _validateEmail(String? value) {
@@ -192,7 +207,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
       if (!mounted) return;
       if (res.isSignedIn) {
-        await _postSignInSuccess();
+        await _postSignInSuccess(password: _passwordController.text);
         return;
       }
       // Handle challenges
@@ -221,7 +236,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         if (newPassword == null || newPassword.isEmpty) return;
         final conf = await controller.confirmSignIn(newPassword);
         if (conf.isSignedIn && mounted) {
-          await _postSignInSuccess();
+          await _postSignInSuccess(password: newPassword);
         }
       }
     } on AuthException catch (e) {
@@ -232,11 +247,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  Future<void> _postSignInSuccess() async {
+  Future<void> _postSignInSuccess({String? password}) async {
     await _sessionManager.handleSuccessfulSignIn(
       email: _emailController.text.trim(),
       rememberMe: _rememberMe,
+      password: password,
     );
+    await _refreshQuickSignInAvailability();
+    await _navigateToHome();
+  }
+
+  Future<void> _navigateToHome() async {
     final requiresVerification = await _checkContactVerification();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
@@ -267,12 +288,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _biometricLogin() async {
-    final ok = await _biometricService.authenticate(
-      reason: 'Authenticate to sign in',
-    );
-    if (!ok) return;
-    final allowQuickSignIn = await _sessionManager.canUseQuickSignIn();
-    if (!allowQuickSignIn) {
+    if (!_quickSignInReady) {
       final rememberEnabled = await _sessionManager.isRememberMeEnabled();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -286,46 +302,82 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
       return;
     }
-    // Try to refresh session using stored refresh token if available.
+
+    final authenticated = await _biometricService.authenticate(
+      reason: 'Authenticate to sign in',
+    );
+    if (!authenticated) return;
+
     try {
       final session = await _sessionManager.currentSession();
       if (session.isSignedIn) {
         if (!mounted) return;
-        final requiresVerification = await _checkContactVerification();
-        if (!mounted) return;
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (_) => HomeScreen(requiresContactVerification: requiresVerification),
-          ),
-          (route) => false,
-        );
+        await _navigateToHome();
         return;
       }
-      final hasStored = await _sessionManager.hasSavedCredentials();
-      if (hasStored) {
-        // Amplify Flutter does not expose a manual refresh call; it refreshes automatically
-        // when making authorized calls. As a fallback, we can attempt a silent signIn
-        // if using SRP requires password; otherwise prompt user.
-        // Here we simply inform the user to sign in normally if session is expired.
+
+      bool quickSignedIn = false;
+      if (ref.read(authConfigProvider).allowBiometricCredentialLogin) {
+        quickSignedIn = await _sessionManager.signInWithStoredCredentials();
+      }
+
+      if (quickSignedIn) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Session expired. Please sign in once.')),
-        );
+        await _navigateToHome();
         return;
       }
+
+      final refreshed = await _sessionManager.currentSession();
+      if (refreshed.isSignedIn) {
+        if (!mounted) return;
+        await _navigateToHome();
+        return;
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No session found. Sign in once to enable quick sign-in.')),
+        const SnackBar(content: Text('Session expired. Please sign in once to enable quick sign-in.')),
       );
+      await _refreshQuickSignInAvailability();
     } on AuthException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message)),
       );
+      await _refreshQuickSignInAvailability();
+    }
+  }
+
+  Future<void> _signInWithSaml() async {
+    if (_samlSigningIn) return;
+    setState(() => _samlSigningIn = true);
+    try {
+      final result = await Amplify.Auth.signInWithWebUI();
+      if (!mounted) return;
+      if (result.isSignedIn) {
+        await _postSignInSuccess();
+      }
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _samlSigningIn = false);
+      }
     }
   }
 
   Future<void> _forgotPassword() async {
+    if (ref.read(authConfigProvider).isFederatedLogin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password resets are handled by your organization. Use your corporate self-service portal.'),
+        ),
+      );
+      return;
+    }
     final email = _emailController.text.trim();
     if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -353,10 +405,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<bool?> _promptForResetConfirmation({required String email}) async {
-    final newPasswordController = TextEditingController();
-    final confirmPasswordController = TextEditingController();
-    final codeController = TextEditingController();
-        final result = await showDialog<_ResetDialogResult>(
+    final result = await showDialog<_ResetDialogResult>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
@@ -366,9 +415,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       },
     );
     if (result == null) {
-      newPasswordController.dispose();
-      confirmPasswordController.dispose();
-      codeController.dispose();
       return false;
     }
     try {
@@ -378,17 +424,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             confirmationCode: result.code,
           );
       return true;
-    } finally {
-      newPasswordController.dispose();
-      confirmPasswordController.dispose();
-      codeController.dispose();
+    } on AuthException catch (e) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      return false;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final authConfig = ref.watch(authConfigProvider);
     final loginState = ref.watch(loginControllerProvider);
     final isLoading = loginState.isLoading;
+
+    if (authConfig.isFederatedLogin) {
+      final effectiveLoading = isLoading || _samlSigningIn;
+      return AuthScaffold(
+        title: 'Login',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (effectiveLoading) ...[
+              const LinearProgressIndicator(),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+            ElevatedButton.icon(
+              onPressed: effectiveLoading ? null : _signInWithSaml,
+              icon: const Icon(Icons.login),
+              label: const Text('Sign in with Microsoft'),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            const Text(
+              'You will be redirected to your organization\'s Entra ID login page. '
+              'Use your corporate credentials and follow any MFA prompts.',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
     return AuthScaffold(
       title: 'Login',
       child: Form(
@@ -443,6 +518,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           v,
                           email: v ? _emailController.text.trim() : null,
                         );
+                        await _refreshQuickSignInAvailability();
                       },
                 ),
                 const Text('Remember me'),
@@ -460,12 +536,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       : const Text('Sign In'),
                 ),
             const SizedBox(height: AppSpacing.sm),
-            if (_biometricsAvailable)
+            if (_biometricsAvailable) ...[
               OutlinedButton.icon(
-                    onPressed: _biometricLogin,
-                    icon: const Icon(Icons.fingerprint),
-                    label: const Text('Use biometrics'),
+                onPressed: (!isLoading && _quickSignInReady) ? _biometricLogin : null,
+                icon: const Icon(Icons.fingerprint),
+                label: const Text('Use biometrics'),
+              ),
+              if (!_quickSignInReady)
+                const Padding(
+                  padding: EdgeInsets.only(top: AppSpacing.xs),
+                  child: Text(
+                    'Sign in once with Remember me enabled to activate quick sign-in.',
+                    textAlign: TextAlign.center,
                   ),
+                ),
+            ],
             TextButton(
                   onPressed: _forgotPassword,
                   child: const Text('Forgot password?'),

@@ -31,6 +31,8 @@ EnvironmentConfig buildEnvironmentConfig(String? rawEnv) {
         authConfig: AuthConfig(
           passwordMinLength: 10,
           rememberMeDefault: false,
+          allowBiometricCredentialLogin: false,
+          authMode: AuthMode.local,
         ),
       );
     case AppEnvironment.prod:
@@ -39,6 +41,8 @@ EnvironmentConfig buildEnvironmentConfig(String? rawEnv) {
         authConfig: AuthConfig(
           passwordMinLength: 12,
           rememberMeDefault: false,
+          allowBiometricCredentialLogin: false,
+          authMode: AuthMode.local,
         ),
       );
     case AppEnvironment.dev:

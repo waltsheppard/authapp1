@@ -8,6 +8,7 @@ class CredentialStorage {
   static const _keyEmail = 'cred_email';
   static const _keyRefreshToken = 'cred_refresh_token';
   static const _keyRemember = 'cred_remember_me';
+  static const _keyPassword = 'cred_password';
   static const _keyPinHash = 'cred_pin_hash';
   static const _keyPinSalt = 'cred_pin_salt';
 
@@ -40,6 +41,18 @@ class CredentialStorage {
     return _storage.read(key: _keyRefreshToken);
   }
 
+  Future<void> savePassword(String password) async {
+    await _storage.write(key: _keyPassword, value: password);
+  }
+
+  Future<String?> readPassword() async {
+    return _storage.read(key: _keyPassword);
+  }
+
+  Future<void> clearPassword() async {
+    await _storage.delete(key: _keyPassword);
+  }
+
   Future<void> savePin(String pin) async {
     final saltBytes = List<int>.generate(16, (_) => _random.nextInt(256));
     final salt = base64Encode(saltBytes);
@@ -70,6 +83,7 @@ class CredentialStorage {
     await _storage.delete(key: _keyEmail);
     await _storage.delete(key: _keyRefreshToken);
     await _storage.delete(key: _keyRemember);
+    await _storage.delete(key: _keyPassword);
     await clearPin();
   }
 

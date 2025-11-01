@@ -63,17 +63,31 @@ class SessionManager {
   Future<void> handleSuccessfulSignIn({
     required String email,
     required bool rememberMe,
+    String? password,
+    bool persistPassword = true,
   }) async {
     if (rememberMe) {
       await _storage.saveRememberMe(true);
       await _storage.saveEmail(email);
       final session = await currentSession();
       final refreshToken = session.userPoolTokensResult.valueOrNull?.refreshToken;
-      if (refreshToken != null) {
+      if (refreshToken != null && refreshToken.isNotEmpty) {
         await _storage.saveRefreshToken(refreshToken);
+      }
+      if (_config.allowBiometricCredentialLogin) {
+        if (persistPassword && password != null && password.isNotEmpty) {
+          await _storage.savePassword(password);
+        } else if (!persistPassword) {
+          // leave existing password untouched
+        } else {
+          await _storage.clearPassword();
+        }
+      } else {
+        await _storage.clearPassword();
       }
     } else {
       await updateRememberMe(false);
+      await _storage.clearPassword();
     }
   }
 
@@ -81,7 +95,12 @@ class SessionManager {
     final remember = await isRememberMeEnabled();
     if (!remember) return false;
     final storedRefresh = await _storage.readRefreshToken();
-    return storedRefresh != null && storedRefresh.isNotEmpty;
+    if (storedRefresh != null && storedRefresh.isNotEmpty) return true;
+    if (_config.allowBiometricCredentialLogin) {
+      final storedPassword = await _storage.readPassword();
+      return storedPassword != null && storedPassword.isNotEmpty;
+    }
+    return false;
   }
 
   Future<String?> savedEmail() => _storage.readEmail();
@@ -89,7 +108,13 @@ class SessionManager {
   Future<bool> hasSavedCredentials() async {
     final email = await savedEmail();
     final refresh = await _storage.readRefreshToken();
-    return email != null && email.isNotEmpty && refresh != null && refresh.isNotEmpty;
+    if (email == null || email.isEmpty) return false;
+    if (refresh != null && refresh.isNotEmpty) return true;
+    if (_config.allowBiometricCredentialLogin) {
+      final password = await _storage.readPassword();
+      if (password != null && password.isNotEmpty) return true;
+    }
+    return false;
   }
 
   Future<CognitoAuthSession> currentSession() async {
@@ -114,6 +139,32 @@ class SessionManager {
     final remember = await isRememberMeEnabled();
     await _storage.clear();
     await _storage.saveRememberMe(remember);
+  }
+
+  Future<bool> signInWithStoredCredentials() async {
+    if (!_config.allowBiometricCredentialLogin) return false;
+    final email = await savedEmail();
+    final password = await _storage.readPassword();
+    if (email == null || email.isEmpty || password == null || password.isEmpty) {
+      return false;
+    }
+    try {
+      await _authRepository.configure();
+      final result = await _authRepository.signIn(email: email, password: password);
+      if (result.isSignedIn) {
+        await handleSuccessfulSignIn(
+          email: email,
+          rememberMe: true,
+          password: password,
+          persistPassword: false,
+        );
+        return true;
+      }
+      return false;
+    } on AuthException {
+      await _storage.clearPassword();
+      return false;
+    }
   }
 }
 
